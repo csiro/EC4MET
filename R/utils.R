@@ -76,7 +76,7 @@ TTfun <- function(Tci, cardT) {
 
 # Potential Evapotranspiration----
 PETthorn <- function(Tave, dl) {
-  Tm <- mean(Tave)
+  Tm <- mean(na.omit(Tave))
   N <- dl[1:length(Tave)] # day lengths
   I <- ((max(0, Tm)) / 5)^1.514 # heat index
   a <- (6.75e-07 * I^3) - (7.71e-05 * I^2) + 0.49239
