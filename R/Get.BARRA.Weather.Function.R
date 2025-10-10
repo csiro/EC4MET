@@ -6,6 +6,8 @@
 #' @param Envs Vector of environment names character strings.
 #' @param Lats Vector of latitude numeric values for each environment in the same order as `Envs`.
 #' @param Lons Vector of longitude numeric values for each environment in the same order as `Envs`.
+#' @param plus.yr Logical. Should the subsequent years weather data also be downloaded? This may be needed if the estimated crop growth stages in the `get.W.ECs()`
+#' function extend after the same year of sowing. 
 #' @param Years Vector of year integer values for each environment in the same order as `Envs`.
 #' @param ncores Number (integer) of cores to use for parallel processing of gridded data over muliple years. Use `1` to run in series. The default (`NULL`) will
 #' use the maximum available cores up to 5. If running in parallel, an output log text file will be created in the working directory.
@@ -44,27 +46,30 @@ get.BARRA.weather <- function(Envs,
                               Lats,
                               Lons,
                               Years,
+                              plus.yr = FALSE,
                               ncores = NULL,
                               verbose = TRUE,
                               dlprompt = FALSE) {
   Years <- as.integer(as.character(Years))
   years <- unique(Years)
+  if(plus.yr) years <- unique(c(years,years+1))
   Envs <- as.character(Envs)
   var.units <- c()
   mons <- stringr::str_pad(1:12, 2, pad = "0")
   vars <- c("pr", "tasmax", "tasmin", "hurs", "rsdt")
 
   # Check for errors
-  if (verbose & length(unique(c(length(Envs), length(Lats), length(Lons), length(Years)))) > 1) {
+  if (length(unique(c(length(Envs), length(Lats), length(Lons), length(Years)))) > 1) {
     print(sapply(list("Envs" = Envs, "Lats" = Lats, "Lons" = Lons, "Years" = Years), length))
     stop("Lengths of Envs, Lats, Lons or Years differ")
   }
-  if (verbose & !is.numeric(Lats)) stop("Lat values not numeric")
-  if (verbose & !is.numeric(Lons)) stop("Lon values not numeric")
-  if (verbose & sum(duplicated(Envs)) > 0) stop(paste("Duplicated Envs:", Envs[duplicated(Envs)]))
-  if (verbose & sum(!years %in% 1979:2023) > 0) stop("Years out of range of BARRA R2 data (Jan 1979 to Sept 2024)")
-  if (verbose & sum(Lons < 88.48 | Lons > 207.39) > 0) stop("Lon out of range of BARRA data: 88.48 to 207.39")
-  if (verbose & sum(Lats < -57.97 | Lats > 12.98) > 0) stop("Lats out of range of BARRA data: -57.97 to -12.98")
+  if (!is.numeric(Lats)) stop("Lat values not numeric")
+  if (!is.numeric(Lons)) stop("Lon values not numeric")
+  if (sum(duplicated(Envs)) > 0) stop(paste("Duplicated Envs:", Envs[duplicated(Envs)]))
+  if(plus.yr & sum(!years %in% 1979:2024) > 0) cat(crayon::yellow("Additional year of weather data outside of range (1979:2024).\n"))
+  if (sum(!years %in% 1979:2023) > 0) stop("Years out of range of BARRA R2 data (Jan 1979 to Sept 2024)")
+  if (sum(Lons < 88.48 | Lons > 207.39) > 0) stop("Lon out of range of BARRA data: 88.48 to 207.39")
+  if (sum(Lats < -57.97 | Lats > 12.98) > 0) stop("Lats out of range of BARRA data: -57.97 to -12.98")
   if(!capabilities("libcurl")){warning("libcurl is not supported!")}
 
   dl.size <- 40000000 * length(vars) * length(Years) * length(mons)
@@ -79,13 +84,11 @@ get.BARRA.weather <- function(Envs,
   #DL files in series
   all.vars.weather <- list()
   for (v in seq_along(vars)) {
-    if (verbose) {
-      cat(vars[v], ":", sep = "")
-    }
+    if (verbose) cat(vars[v], ":", sep = "")
+  
     for (y in seq_along(years)) {
-      if (verbose) {
-        cat(years[y], "|", sep = "")
-      }
+      if (verbose) cat(years[y], "|", sep = "")
+      
       addrs <- paste("https://thredds.nci.org.au/thredds/fileServer/ob53/output/reanalysis/AUS-11/BOM/ERA5/historical/hres/BARRA-R2/v1/day/",
                  vars[v], "/latest/", vars[v], "_AUS-11_ERA5_historical_hres_BOM_BARRA-R2_v1_day_", years, mons, "-", years, mons, ".nc",
                  sep = ""
@@ -112,34 +115,26 @@ get.BARRA.weather <- function(Envs,
     
     
     if (isTRUE(ncores == 1)) { # Run in series
-      if (verbose) {
-        cat("\nRunning in series...")
-      }
+      if (verbose) cat("\nRunning in series...")
       `%how%` <- foreach::`%do%`
     }
     
     
   if (isTRUE(ncores > 1)) { # Run in parallel
-    if (verbose) {
-      cat("\nRunning in parallel...")
-    }
+    if (verbose) cat("\nRunning in parallel...")
     suppressWarnings(file.remove("BARRA_download_log.txt", showWarnings = FALSE))
     cl <- parallel::makeCluster(ncores, outfile = "BARRA_download_log.txt")
     doParallel::registerDoParallel(cl)
-    if (verbose) {
-      cat(paste("\nProgress log output to:\n", getwd(), "/BARRA_download_log.txt", sep = ""))
-    }
+    if (verbose) cat(paste("\nProgress log output to:\n", getwd(), "/BARRA_download_log.txt", sep = ""))
     on.exit(expr = closeAllConnections())
     `%how%` <- foreach::`%dopar%`
   }
 
   all.yrs.weather <- foreach::foreach(y = seq_along(years), .combine = rbind, .multicombine = T, .export = "nc.process") %how% {
-    if (verbose) { cat("\nStarting", years[y]) }
+    if (verbose) cat("\nStarting", years[y],": ")
       all.mons.weather <- list()
       for (m in 1:length(mons)) {
-        if (verbose) {
-          cat(month.abb[m], "|", sep = "")
-        }
+        if (verbose) cat(month.abb[m], "|", sep = "")
         nc.path <- paste(tmp.dir,"/",paste(vars[v], years[y], mons[m], sep="_"), ".nc", sep = "")
         nc.data <- try(nc.process(nc.path))
         if(class(nc.data)=="try-error"){
@@ -154,10 +149,7 @@ get.BARRA.weather <- function(Envs,
         all.mons.weather[[m]] <- nc.data
       }
       gc(full = T)
-      if (verbose) {
-        cat("\n")
-      }
-
+ 
       tnames <- unlist(lapply(all.mons.weather, function(x) dimnames(x)[[3]]))
       all.mons.weather <- abind::abind(all.mons.weather, along = 3)
 

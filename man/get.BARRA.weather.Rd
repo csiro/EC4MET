@@ -9,6 +9,7 @@ get.BARRA.weather(
   Lats,
   Lons,
   Years,
+  plus.yr = FALSE,
   ncores = NULL,
   verbose = TRUE,
   dlprompt = FALSE
@@ -22,6 +23,9 @@ get.BARRA.weather(
 \item{Lons}{Vector of longitude numeric values for each environment in the same order as \code{Envs}.}
 
 \item{Years}{Vector of year integer values for each environment in the same order as \code{Envs}.}
+
+\item{plus.yr}{Logical. Should the subsequent years weather data also be downloaded? This may be needed if the estimated crop growth stages in the \code{get.W.ECs()}
+function extend after the same year of sowing.}
 
 \item{ncores}{Number (integer) of cores to use for parallel processing of gridded data over muliple years. Use \code{1} to run in series. The default (\code{NULL}) will
 use the maximum available cores up to 5. If running in parallel, an output log text file will be created in the working directory.}
