@@ -1,9 +1,11 @@
-## EC4MET 2.1
+## EC4MET 2.2
 
-### (2025.10.02)
+### (2025.10.07)
 
 -   `plus.yr` parameter added to `get.SILO.weather()` function to download two years of weather data at a time for environments where estimated crop growth stages over-run the end of the sowing year.
--   `crop.locs()` added to easily define a grid of locations within the australian crop growing regions.
+-   `crop.locs()` added to easily define a grid of locations within the Australian crop growing regions.
+
+## EC4MET 2.1
 
 ## EC4MET 2.0
 
